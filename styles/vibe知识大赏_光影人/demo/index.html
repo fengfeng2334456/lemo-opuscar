@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>vibe知识大赏_光影人 guangying-ren — styleframe</title>
+<style>
+  html,body{margin:0;padding:0;background:#000;}
+  canvas{display:block;}
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+/* ============================================================
+   vibe知识大赏_光影人 Guangying Ren  —  竖屏 1080×1920, DUR 6 s
+   参照：抖音「vibe知识大赏」真实画面
+   近黑底 / 纯黑剪影人物看手机 / 手机屏是唯一光源（青）
+   顶部白字字幕 / 中央「刷到的视频」卡片（暖橙描边发光）
+   ============================================================ */
+
+const DUR = 6.0;
+
+/* ---------- fonts ---------- */
+const fonts = [
+  new FontFace('SerifSC', 'url(fonts/NotoSerifSC-400b.woff2)'),
+  new FontFace('SansSC',  'url(fonts/NotoSansSC-900.woff2)'),
+];
+let FONTS_READY = false;
+Promise.all(fonts.map(f => f.load())).then(fs => { fs.forEach(f => document.fonts.add(f)); FONTS_READY = true; })
+  .catch(e => console.error('FONT LOAD FAIL:', e));
+
+/* ---------- helpers ---------- */
+function seg(t, a, b) { return Math.max(0, Math.min(1, (t - a) / (b - a))); }
+function ease(u) { return u * u * (3 - 2 * u); }
+
+function mulberry(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* roundRect fallback (older chromium) */
+function rr(g, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+/* ---------- scene constants ---------- */
+const W = 1080, H = 1920;
+const PHONE = { x: 652, y: 1406 };          // 屏幕(光源)中心
+const GLOW_COL = '150,214,230';             // 青白
+const WARM_COL = '127,216,232';             // 卡片霓虹（青）
+
+/* ---------- background: near-black with a faint warm floor ---------- */
+function background(g, t) {
+  const base = g.createLinearGradient(0, 0, 0, H);
+  base.addColorStop(0, '#050505');
+  base.addColorStop(.62, '#080706');
+  base.addColorStop(1, '#0b0907');
+  g.fillStyle = base;
+  g.fillRect(0, 0, W, H);
+
+  // a barely-there cool wash behind the figure (breathes slowly)
+  const br = .5 + .5 * Math.sin(t * .9);
+  const wash = g.createRadialGradient(PHONE.x, PHONE.y, 40, PHONE.x, PHONE.y, 720);
+  wash.addColorStop(0, `rgba(${GLOW_COL},${(.10 + br * .05).toFixed(3)})`);
+  wash.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = wash;
+  g.fillRect(0, 0, W, H);
+
+  // dark four-pane window, left side — barely visible
+  g.save();
+  g.strokeStyle = '#0e1114';
+  g.fillStyle = '#0a0d10';
+  g.lineWidth = 10;
+  const wx = 96, wy = 1080, ww = 232, wh = 300;
+  g.beginPath(); rr(g, wx, wy, ww, wh, 6); g.fill();
+  g.stroke();
+  g.beginPath();
+  g.moveTo(wx + ww / 2, wy); g.lineTo(wx + ww / 2, wy + wh);
+  g.moveTo(wx, wy + wh / 2); g.lineTo(wx + ww, wy + wh / 2);
+  g.strokeStyle = '#040506'; g.lineWidth = 8; g.stroke();
+  g.restore();
+
+  // grain — static, very low alpha
+  const rnd = mulberry(7);
+  g.fillStyle = 'rgba(255,255,255,1)';
+  for (let i = 0; i < 420; i++) {
+    g.globalAlpha = .012 + rnd() * .022;
+    g.fillRect(rnd() * W, rnd() * H, 1.4, 1.4);
+  }
+  g.globalAlpha = 1;
+}
+
+/* ---------- the phone: the only light source ---------- */
+function phoneLight(g, t) {
+  const flick = .92 + .08 * Math.sin(t * 5.3) * Math.sin(t * 2.1);
+  // big soft pool of light in front of the screen
+  const pool = g.createRadialGradient(PHONE.x, PHONE.y, 10, PHONE.x, PHONE.y, 460);
+  pool.addColorStop(0, `rgba(${GLOW_COL},${(.30 * flick).toFixed(3)})`);
+  pool.addColorStop(.45, `rgba(${GLOW_COL},${(.12 * flick).toFixed(3)})`);
+  pool.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = pool;
+  g.fillRect(0, 0, W, H);
+}
+
+function phoneScreen(g, t) {
+  const flick = .9 + .1 * Math.sin(t * 5.3) * Math.sin(t * 2.1);
+  const pw = 50, ph = 86, r = 9;
+  g.save();
+  g.translate(PHONE.x, PHONE.y);
+  g.rotate(-.12);                        // nearly upright, tilted to the face
+  g.shadowColor = `rgba(${GLOW_COL},${.9 * flick})`;
+  g.shadowBlur = 70;
+  const scr = g.createLinearGradient(0, -ph / 2, 0, ph / 2);
+  scr.addColorStop(0, `rgba(205,232,238,${.82 * flick})`);
+  scr.addColorStop(1, `rgba(118,178,192,${.7 * flick})`);
+  g.fillStyle = scr;
+  g.beginPath(); rr(g, -pw / 2, -ph / 2, pw, ph, r); g.fill();
+  g.shadowBlur = 0;
+  g.restore();
+}
+
+/* ---------- the watcher: pure-black seated silhouette, phone at the face ---------- */
+function watcher(g, alpha) {
+  g.save();
+  g.globalAlpha = alpha;
+  // bed edge he sits on
+  g.strokeStyle = '#241b11';
+  g.lineWidth = 30;
+  g.beginPath(); g.moveTo(60, 1768); g.lineTo(1020, 1768); g.stroke();
+
+  g.strokeStyle = '#010101';
+  g.fillStyle = '#010101';
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+
+  // hips: a rounded mass at the lower left
+  g.beginPath(); g.ellipse(448, 1716, 92, 72, .1, 0, Math.PI * 2); g.fill();
+
+  // torso: short, hunched — arches left from the hips up to dropped shoulders
+  g.lineWidth = 76;
+  g.beginPath(); g.moveTo(452, 1692); g.quadraticCurveTo(388, 1560, 498, 1444); g.stroke();
+
+  // head: bowed deeply toward the phone
+  g.beginPath(); g.arc(566, 1358, 64, 0, Math.PI * 2); g.fill();
+
+  // thigh to a raised knee (knee up-right), shin down to the floor
+  g.lineWidth = 60;
+  g.beginPath(); g.moveTo(492, 1676); g.quadraticCurveTo(620, 1668, 692, 1544); g.stroke();
+  g.lineWidth = 48;
+  g.beginPath(); g.moveTo(692, 1544); g.lineTo(668, 1752); g.stroke();
+  // second leg, slightly behind
+  g.lineWidth = 44;
+  g.beginPath(); g.moveTo(480, 1694); g.quadraticCurveTo(580, 1692, 634, 1592); g.stroke();
+  g.beginPath(); g.moveTo(634, 1592); g.lineTo(616, 1752); g.stroke();
+
+  // arm from the dropped shoulder to the hand holding the phone
+  g.lineWidth = 40;
+  g.beginPath(); g.moveTo(514, 1452); g.quadraticCurveTo(580, 1484, 642, 1452); g.stroke();
+
+  /* --- light on the figure --- */
+  // big halo ellipse looping around the head (like an orbit)
+  g.strokeStyle = `rgba(${GLOW_COL},.55)`;
+  g.lineWidth = 3.5;
+  g.save();
+  g.translate(548, 1372); g.rotate(-.1);
+  g.beginPath(); g.ellipse(0, 0, 262, 62, 0, 0, Math.PI * 2); g.stroke();
+  g.restore();
+
+  // cyan rim along the phone-facing edge (head + arm)
+  g.shadowColor = `rgba(${GLOW_COL},.9)`;
+  g.shadowBlur = 26;
+  g.strokeStyle = `rgba(${GLOW_COL},.95)`;
+  g.lineWidth = 5;
+  g.beginPath(); g.arc(566, 1358, 64, -.3, 1.55); g.stroke();
+  g.beginPath(); g.moveTo(516, 1450); g.quadraticCurveTo(582, 1482, 642, 1450); g.stroke();
+  // faint warm-red rim on the arched back
+  g.shadowColor = 'rgba(224,96,90,.7)';
+  g.strokeStyle = 'rgba(224,96,90,.55)';
+  g.lineWidth = 4;
+  g.beginPath(); g.moveTo(414, 1688); g.quadraticCurveTo(362, 1556, 466, 1432); g.stroke();
+  g.shadowBlur = 0;
+  g.restore();
+}
+
+/* ---------- top captions ---------- */
+function captions(g, t) {
+  const a = ease(seg(t, .5, 1.5));
+  if (a <= 0) return;
+  g.save();
+  g.globalAlpha = a;
+  g.fillStyle = '#e9e6e1';
+  g.font = '400 54px SerifSC';
+  g.textAlign = 'center';
+  g.shadowColor = 'rgba(0,0,0,.8)'; g.shadowBlur = 8;
+  g.fillText('比如你刷到的同龄人，', W / 2, 436);
+  g.fillText('好像个个都比你强。', W / 2, 532);
+  g.restore();
+}
+
+/* ---------- the "video you scrolled into" card ---------- */
+function feedCard(g, t) {
+  const u = ease(seg(t, 1.6, 2.4));
+  if (u <= 0) return;
+  const cw = 720, ch = 300, cx = W / 2, cy = 810;
+  const sc = .96 + .04 * u;
+  g.save();
+  g.globalAlpha = u;
+  g.translate(cx, cy); g.scale(sc, sc);
+  // body
+  g.fillStyle = '#0c0a08';
+  g.strokeStyle = `rgba(${WARM_COL},.92)`;
+  g.lineWidth = 5;
+  g.shadowColor = `rgba(${WARM_COL},.55)`;
+  g.shadowBlur = 42;
+  g.beginPath(); rr(g, -cw / 2, -ch / 2, cw, ch, 34); g.fill(); g.stroke();
+  g.shadowBlur = 0;
+  // text
+  g.fillStyle = '#f2efe9';
+  g.textAlign = 'center';
+  g.font = '900 92px SansSC';
+  g.fillText('同龄人', 0, -18);
+  g.fillText('已经买房了', 0, 92);
+  g.restore();
+}
+
+/* ---------- ghost of previous captions fading at the very top ---------- */
+function ghostLine(g, t) {
+  const a = (1 - ease(seg(t, 1.2, 2.6))) * .16;
+  if (a <= 0) return;
+  g.save();
+  g.globalAlpha = a;
+  g.fillStyle = '#cfc9bf';
+  g.font = '400 46px SerifSC';
+  g.textAlign = 'center';
+  g.fillText('刷到了，', W / 2, 210);
+  g.restore();
+}
+
+/* ---------- render entry: render(t) — the page owns its canvas ---------- */
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+window.render = function (t) {
+  const g = ctx;
+  background(g, t);
+  const fa = ease(seg(t, .2, 1.0));
+  phoneLight(g, t);
+  watcher(g, fa);
+  ghostLine(g, t);
+  captions(g, t);
+  feedCard(g, t);
+  if (fa > 0) phoneScreen(g, t);
+};
+
+/* readcheck contract: every on-screen text */
+window.TEXTS = function (t) {
+  const out = [];
+  if (t > 1.2) { out.push({ text: '比如你刷到的同龄人，', x: 540, y: 436, size: 54 }); }
+  if (t > 1.2) { out.push({ text: '好像个个都比你强。', x: 540, y: 532, size: 54 }); }
+  if (t > 2.4) { out.push({ text: '同龄人', x: 540, y: 912, size: 92 }); }
+  if (t > 2.4) { out.push({ text: '已经买房了', x: 540, y: 1022, size: 92 }); }
+  return out;
+};
+
+window.DUR = DUR;
+window.READY = false;
+Promise.all(fonts.map(f => f.load()))
+  .then(fs => { fs.forEach(f => document.fonts.add(f)); FONTS_READY = true; window.READY = true; })
+  .catch(e => { console.error('FONT LOAD FAIL:', e); window.READY = true; });
+</script>
+</body>
+</html>

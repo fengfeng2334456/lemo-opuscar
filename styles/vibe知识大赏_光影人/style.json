@@ -1,0 +1,23 @@
+{
+  "slug": "guangying-ren",
+  "dir": "vibe知识大赏_光影人",
+  "name_zh": "vibe知识大赏_光影人",
+  "name_en": "Guangying Ren (Light & Shadow Figure)",
+  "former_names": ["暗室微光", "Low Light", "low-light"],
+  "base": "scratch (technique ref: dark-keynote; light-as-storyteller from stained-glass; caption-first from caption-news)",
+  "reference": {
+    "douyin": "vibe知识大赏 (视频号 29881358003)",
+    "local_copy": "Z:/UserFilesData/Videos/抖音爆款案例/vibe知识大赏.mp4",
+    "measured": "720x1280, 98.9s, 30fps, mean luma 32/255, no narration, music only"
+  },
+  "aspect": "1080x1920",
+  "fonts": ["Noto Serif SC 400 (captions)", "Noto Sans SC 900 (cards)"],
+  "files": {
+    "style": "style/",
+    "demo": "demo/index.html",
+    "render": "cd $LEMO && LEMO_ANGLE=default node core/render/still.mjs <demo> <t> --size 1080x1920"
+  },
+  "signature_moves": ["halo ring draws around the bowed head", "feed-card pops in with neon edge"],
+  "renamed_at": "2026-10-31",
+  "created": "2026-10-31"
+}
