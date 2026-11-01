@@ -26,8 +26,6 @@ styles/*/demo/music.wav
 *.log
 # 喊词是输入素材（只能在 macOS 上近似重建），要提交
 !styles/game-show/demo/voices/*.wav
-# 赛事官方图，只作参考、不分发（片中标识怎么处理开源前再定）
-styles/pictogram-motion/demo/ref/
 styles/*/demo/music/src/
 
 # ---- 2026-09-26 GitHub 发布前补充 ----
